@@ -20,7 +20,7 @@ export class GameUI {
         <div class="hud-title">THE SEEKER</div>
         <div class="hud-subtitle">Path of the Wayfarer</div>
         <div class="faith-bar-container">
-          <div class="faith-bar-label">FAITH ENERGY (Q)</div>
+          <div class="faith-bar-label">FAITH ENERGY</div>
           <div class="faith-bar-track">
             <div id="faith-bar-fill" class="faith-bar-fill"></div>
           </div>
@@ -33,11 +33,11 @@ export class GameUI {
           <div class="compass-label">N</div>
         </div>
         <div class="hud-buttons">
-          <button id="btn-journal" class="hud-btn">📜 Journal [Tab]</button>
-          <button id="btn-audio" class="hud-btn">🎵 Audio</button>
-          <button id="btn-help" class="hud-btn">❓ Help</button>
-          <button id="btn-install" class="hud-btn install-btn hidden">📲 Install</button>
-          <button id="btn-fullscreen" class="hud-btn">⛶</button>
+          <button id="btn-journal" class="hud-btn" aria-label="Journal">📜</button>
+          <button id="btn-audio" class="hud-btn" aria-label="Sound">🎵</button>
+          <button id="btn-help" class="hud-btn" aria-label="Help">❓</button>
+          <button id="btn-install" class="hud-btn install-btn hidden" aria-label="Install">📲</button>
+          <button id="btn-fullscreen" class="hud-btn" aria-label="Fullscreen">⛶</button>
         </div>
       </div>
 
@@ -50,16 +50,7 @@ export class GameUI {
       </div>
 
       <div class="prompt-interaction" id="interaction-prompt">
-        <span class="key-badge">E</span> <span id="prompt-text">Interact</span>
-      </div>
-
-      <div class="bottom-controls-hint">
-        <span>[WASD] Move</span>
-        <span>[Space] Jump</span>
-        <span>[Shift] Sprint</span>
-        <span>[R] Dodge Roll</span>
-        <span>[Q] Light of Faith</span>
-        <span>[E] Interact</span>
+        <span class="key-badge">💬</span> <span id="prompt-text">Interact</span>
       </div>
     `;
     document.body.appendChild(this.hudEl);
@@ -134,16 +125,15 @@ export class GameUI {
         
         <div class="help-grid">
           <div class="help-section">
-            <h4>🎮 Controls (Desktop & Mouse)</h4>
+            <h4>🎮 Touch Controls</h4>
             <ul>
-              <li><strong>W / A / S / D:</strong> Walk / Run</li>
-              <li><strong>Left Shift:</strong> Sprint</li>
-              <li><strong>Spacebar:</strong> Jump & Vault</li>
-              <li><strong>R:</strong> Dodge Roll</li>
-              <li><strong>Q:</strong> Activate "Light of Faith" (Illuminates darkness & spiritual glyphs)</li>
-              <li><strong>E:</strong> Interact with villagers, sheep, and objects</li>
-              <li><strong>Tab:</strong> Open Scripture Journal</li>
-              <li><strong>Mouse:</strong> Rotate camera perspective</li>
+              <li><strong>Left thumb:</strong> Drag anywhere on the left side to walk / run</li>
+              <li><strong>Right thumb:</strong> Drag to rotate the camera, pinch to zoom</li>
+              <li><strong>⬆ JUMP:</strong> Jump & vault</li>
+              <li><strong>💨 ROLL:</strong> Dodge roll</li>
+              <li><strong>✨ FAITH:</strong> Light of Faith (illuminates darkness & glyphs)</li>
+              <li><strong>💬 ACT:</strong> Talk to villagers, guide sheep, pick up objects</li>
+              <li><strong>📜:</strong> Open Scripture Journal</li>
             </ul>
           </div>
           <div class="help-section">
@@ -217,10 +207,10 @@ export class GameUI {
       sounds.ensureContext();
       if (!sounds.bgmPlaying) {
         sounds.startMusic();
-        btnAudio.innerText = "🎵 Sound: ON";
+        btnAudio.innerText = "🔊";
       } else {
         sounds.isMuted = !sounds.isMuted;
-        btnAudio.innerText = sounds.isMuted ? "🔇 Muted" : "🎵 Sound: ON";
+        btnAudio.innerText = sounds.isMuted ? "🔇" : "🔊";
       }
     });
 

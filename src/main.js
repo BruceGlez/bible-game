@@ -14,18 +14,23 @@ class Game {
 
     // Scene & Renderer
     this.scene = new THREE.Scene();
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', stencil: false });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Mobile: cap pixel ratio (adaptive scaler adjusts it at runtime based on FPS)
+    this.maxPixelRatio = Math.min(window.devicePixelRatio, 2);
+    this.currentPixelRatio = Math.min(window.devicePixelRatio, 1.75);
+    this.renderer.setPixelRatio(this.currentPixelRatio);
+    this.fpsSampleTime = 0;
+    this.fpsSampleFrames = 0;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.1;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.container.appendChild(this.renderer.domElement);
 
     // Camera
-    this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 400);
+    this.camera = new THREE.PerspectiveCamera(this.getMobileFov(), window.innerWidth / window.innerHeight, 0.1, 400);
     this.cameraDistance = 7.5;
     this.cameraAngleH = 0; // Horizontal orbit angle
     this.cameraAngleV = 0.32; // Vertical pitch
@@ -562,7 +567,7 @@ class Game {
       } else if (activeQ.id === 'ancient_cavern') {
         const cavernDist = Math.hypot(p.x - (-55), p.z - 35);
         if (cavernDist < 9.0) {
-          foundPrompt = "Press [Q] to Cast Light of Faith";
+          foundPrompt = "Tap ✨ FAITH to Cast Light";
         }
       }
     }
@@ -606,10 +611,35 @@ class Game {
     this.ui.updateCompass(this.cameraAngleH);
   }
 
+  getMobileFov() {
+    // Portrait phones need a wider vertical FOV so the world isn't cramped horizontally
+    const aspect = window.innerWidth / window.innerHeight;
+    return aspect < 1 ? 70 : 58;
+  }
+
   onWindowResize() {
+    this.camera.fov = this.getMobileFov();
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  updateAdaptiveResolution(delta) {
+    // Sample FPS every 2s and scale render resolution to hold ~50+ FPS on phones
+    this.fpsSampleTime += delta;
+    this.fpsSampleFrames++;
+    if (this.fpsSampleTime < 2) return;
+    const fps = this.fpsSampleFrames / this.fpsSampleTime;
+    this.fpsSampleTime = 0;
+    this.fpsSampleFrames = 0;
+
+    let next = this.currentPixelRatio;
+    if (fps < 42) next = Math.max(0.85, this.currentPixelRatio - 0.25);
+    else if (fps > 57) next = Math.min(this.maxPixelRatio, this.currentPixelRatio + 0.125);
+    if (next !== this.currentPixelRatio) {
+      this.currentPixelRatio = next;
+      this.renderer.setPixelRatio(next);
+    }
   }
 
   animate() {
@@ -648,6 +678,10 @@ class Game {
 
     // Update World animations
     this.world.update(delta, elapsedTime);
+    this.world.followTarget(this.character.position);
+
+    // Hold frame rate on phones
+    this.updateAdaptiveResolution(delta);
 
     // Update Sheep
     this.updateSheepLogic(delta);

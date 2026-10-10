@@ -24,34 +24,85 @@ export class BiblicalWorld {
   }
 
   createEnvironment() {
-    // Warm biblical golden daylight & atmospheric fog
-    this.scene.background = new THREE.Color(0xdcecfb);
-    this.scene.fog = new THREE.FogExp2(0xe8e0d4, 0.0065);
+    // Warm biblical golden daylight & atmospheric fog (fog color matches sky horizon for seamless blend)
+    const horizonColor = new THREE.Color(0xf3e3c6);
+    this.scene.background = horizonColor.clone();
+    this.scene.fog = new THREE.FogExp2(0xefdfc4, 0.0075);
+
+    // Gradient sky dome: deep azure zenith -> warm golden horizon with sun glow
+    const skyGeo = new THREE.SphereGeometry(300, 24, 12);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      uniforms: {
+        topColor: { value: new THREE.Color(0x5c9ee0) },
+        midColor: { value: new THREE.Color(0xa9d0f0) },
+        bottomColor: { value: horizonColor },
+        sunDir: { value: new THREE.Vector3(65, 95, 45).normalize() }
+      },
+      vertexShader: `
+        varying vec3 vDir;
+        void main() {
+          vDir = normalize(position);
+          vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          gl_Position = p.xyww;
+        }`,
+      fragmentShader: `
+        uniform vec3 topColor; uniform vec3 midColor; uniform vec3 bottomColor; uniform vec3 sunDir;
+        varying vec3 vDir;
+        void main() {
+          float h = clamp(vDir.y, 0.0, 1.0);
+          vec3 col = mix(bottomColor, midColor, smoothstep(0.0, 0.25, h));
+          col = mix(col, topColor, smoothstep(0.25, 0.9, h));
+          float sun = max(dot(normalize(vDir), sunDir), 0.0);
+          col += vec3(1.0, 0.85, 0.55) * pow(sun, 64.0) * 0.9;
+          col += vec3(1.0, 0.8, 0.5) * pow(sun, 6.0) * 0.18;
+          gl_FragColor = vec4(col, 1.0);
+        }`
+    });
+    this.skyDome = new THREE.Mesh(skyGeo, skyMat);
+    this.skyDome.frustumCulled = false;
+    this.skyDome.renderOrder = -1;
+    this.scene.add(this.skyDome);
 
     // Ambient light - warm desert bounce & sky illumination
-    const hemiLight = new THREE.HemisphereLight(0xfff7ea, 0x8a7761, 0.85);
+    const hemiLight = new THREE.HemisphereLight(0xcfe4ff, 0xa8875e, 0.95);
     this.scene.add(hemiLight);
 
-    // Main Golden Sun
-    this.sunLight = new THREE.DirectionalLight(0xfff1cf, 1.4);
-    this.sunLight.position.set(65, 95, 45);
+    // Main Golden Sun - shadow frustum follows the player (see followTarget) for crisp, cheap shadows
+    this.sunOffset = new THREE.Vector3(32, 48, 22);
+    this.sunLight = new THREE.DirectionalLight(0xffe9c2, 1.65);
+    this.sunLight.position.copy(this.sunOffset);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 2048;
-    this.sunLight.shadow.mapSize.height = 2048;
-    this.sunLight.shadow.camera.near = 10;
-    this.sunLight.shadow.camera.far = 260;
-    const d = 80;
+    this.sunLight.shadow.mapSize.width = 1024;
+    this.sunLight.shadow.mapSize.height = 1024;
+    this.sunLight.shadow.camera.near = 5;
+    this.sunLight.shadow.camera.far = 140;
+    const d = 30;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
     this.sunLight.shadow.camera.top = d;
     this.sunLight.shadow.camera.bottom = -d;
-    this.sunLight.shadow.bias = -0.0004;
+    this.sunLight.shadow.bias = -0.0006;
+    this.sunLight.shadow.normalBias = 0.04;
     this.scene.add(this.sunLight);
+    this.scene.add(this.sunLight.target);
 
     // Soft warm fill light for gentle stylized shadows
     const fillLight = new THREE.DirectionalLight(0xd9b382, 0.35);
     fillLight.position.set(-50, 40, -40);
     this.scene.add(fillLight);
+  }
+
+  followTarget(pos) {
+    // Keep sun shadow frustum centered on the player; snap to texel grid to avoid shimmering
+    const snap = 0.5;
+    const x = Math.round(pos.x / snap) * snap;
+    const z = Math.round(pos.z / snap) * snap;
+    this.sunLight.target.position.set(x, 0, z);
+    this.sunLight.position.set(x + this.sunOffset.x, this.sunOffset.y, z + this.sunOffset.z);
+    if (this.skyDome) this.skyDome.position.set(pos.x, 0, pos.z);
   }
 
   getTerrainHeight(x, z) {
@@ -151,6 +202,11 @@ export class BiblicalWorld {
       if (y > 6.0) {
         finalCol.lerp(colCliff, Math.min(1, (y - 6.0) / 8.0));
       }
+
+      // Painterly brightness variation (cheap pseudo-noise baked into vertex colors)
+      const n = Math.sin(x * 0.37 + z * 0.11) * Math.cos(z * 0.29 - x * 0.07) * 0.5
+              + Math.sin(x * 1.3 + z * 1.7) * 0.25;
+      finalCol.multiplyScalar(1.0 + n * 0.09);
 
       colors[i * 3] = finalCol.r;
       colors[i * 3 + 1] = finalCol.g;

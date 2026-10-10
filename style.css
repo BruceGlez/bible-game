@@ -879,3 +879,116 @@ body, html {
   font-size: 0.82rem;
   flex-shrink: 0;
 }
+
+/* =====================================================================
+   MOBILE-ONLY LAYER (overrides desktop rules above)
+   ===================================================================== */
+html, body {
+  padding: 0; /* insets handled per element */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+  height: 100dvh;
+}
+
+.mobile-controls-container { display: block !important; }
+.bottom-controls-hint { display: none !important; }
+
+/* Compact parchment HUD (no backdrop blur: expensive on mobile GPUs) */
+.hud-top-left {
+  padding: 8px 12px;
+  border-radius: 10px;
+  backdrop-filter: none;
+  background: rgba(246, 237, 219, 0.9);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.hud-title { font-size: 0.95rem; letter-spacing: 1.5px; }
+.hud-subtitle { display: none; }
+.faith-bar-label { font-size: 0.6rem; margin-bottom: 3px; }
+.faith-bar-track { width: 130px; height: 9px; }
+
+.hud-top-right { gap: 8px; align-items: flex-start; }
+.compass-container { width: 42px; height: 42px; }
+.hud-buttons { gap: 6px; }
+.hud-btn {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+.hud-btn:hover { transform: none; }
+.hud-btn:active { transform: scale(0.92); background: #fbf5e7; }
+.hud-btn.hidden { display: none; }
+
+/* Quest tracker: compact card under the HUD */
+.quest-tracker {
+  top: calc(84px + env(safe-area-inset-top, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px));
+  max-width: min(260px, 62vw);
+  padding: 8px 12px;
+  backdrop-filter: none;
+}
+.quest-tracker-badge { font-size: 0.55rem; }
+.quest-tracker-title { font-size: 0.85rem; }
+.quest-tracker-ref { font-size: 0.7rem; }
+.quest-tracker-obj { font-size: 0.78rem; line-height: 1.3; }
+.quest-tracker-progress { font-size: 0.72rem; }
+
+/* Interaction prompt sits above the thumbs, centered */
+.prompt-interaction {
+  bottom: calc(176px + env(safe-area-inset-bottom, 0px));
+  font-size: 0.9rem;
+  padding: 7px 16px;
+  max-width: 86vw;
+  white-space: nowrap;
+}
+.key-badge { font-family: inherit; padding: 1px 6px; }
+
+.game-notification {
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  font-size: 0.85rem;
+  padding: 10px 16px;
+  width: max-content;
+  max-width: 92vw;
+  text-align: center;
+}
+
+/* Modals: fit phone screens, scroll inside */
+.parchment-box {
+  padding: 20px 18px;
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+.dialogue-box, .help-box, .reward-box, .ios-install-box { width: 92vw; }
+.journal-book { width: 94vw; height: auto; padding: 22px 16px; }
+.journal-book-layout, .help-grid { grid-template-columns: 1fr; gap: 16px; }
+.left-page { border-right: none; border-bottom: 2px dashed #ccb28a; padding-bottom: 14px; }
+.parchment-btn { min-height: 44px; touch-action: manipulation; }
+.journal-close-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+
+/* Touch controls: stronger depth & readability over bright scenery */
+.touch-btn { box-shadow: 0 5px 0 rgba(90, 62, 28, 0.55), 0 8px 16px rgba(0,0,0,0.35); }
+.touch-btn:active { transform: translateY(3px) scale(0.95); box-shadow: 0 2px 0 rgba(90, 62, 28, 0.55), 0 3px 8px rgba(0,0,0,0.35); }
+.joystick-zone { transition: none; }
+
+/* Portrait: stack HUD buttons under the compass */
+@media (orientation: portrait) {
+  .hud-top-right { flex-direction: column; align-items: flex-end; }
+  .hud-buttons { flex-direction: column; }
+}
+
+/* Short landscape phones */
+@media (orientation: landscape) and (max-height: 500px) {
+  .quest-tracker { top: calc(72px + env(safe-area-inset-top, 0px)); max-width: 230px; }
+  .quest-tracker-obj { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .prompt-interaction { bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .hud-btn, .compass-container { width: 38px; height: 38px; }
+  .joystick-zone { width: 112px; height: 112px; }
+}
