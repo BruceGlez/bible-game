@@ -5,9 +5,11 @@ A vibrant third-person 3D action-exploration game set in ancient biblical Judea.
 
 ---
 
-## 🎮 Live Game Preview
-The game server is currently running live at:
-👉 **[http://localhost:5174](http://localhost:5174)**
+## 🎮 Play Online (GitHub Pages)
+The game is automatically deployed and hosted on GitHub Pages:
+👉 **[https://bruceglez.github.io/bible-game/](https://bruceglez.github.io/bible-game/)**
+
+Every commit pushed to the `main` branch automatically triggers the GitHub Actions workflow to rebuild and republish the game.
 
 ---
 
