@@ -130,11 +130,12 @@ export class QuestManager {
       }
     ];
 
-    this.activeQuest = this.quests[0];
+    this.activeQuest = null; // No quest active until accepted by player!
   }
 
   getActiveQuest() {
-    return this.quests.find(q => q.status === 'active') || this.quests.find(q => q.status === 'available');
+    // Only return quests that have actually been accepted and are in progress or ready to turn in
+    return this.quests.find(q => q.status === 'active' || q.status === 'ready') || null;
   }
 
   startQuest(questId) {
@@ -142,7 +143,7 @@ export class QuestManager {
     if (q && q.status === 'available') {
       q.status = 'active';
       this.activeQuest = q;
-      this.ui.showNotification(`New Quest: ${q.title}`);
+      this.ui.showNotification(`Mission Accepted: ${q.title}`);
       this.ui.updateQuestHUD(q);
       sounds.playScrollPickup();
     }
@@ -223,8 +224,9 @@ export class QuestManager {
     if (!q || q.status !== 'ready') return;
 
     q.status = 'completed';
+    this.activeQuest = null;
     sounds.playQuestComplete();
-    this.ui.showNotification(`Quest Completed: ${q.title}!`);
+    this.ui.showNotification(`Mission Completed: ${q.title}!`);
 
     // Add scripture scroll reward to journal
     if (q.scrollReward) {
@@ -232,12 +234,11 @@ export class QuestManager {
       this.ui.showScrollUnlockedModal(q.scrollReward);
     }
 
-    // Unlock next quest in series
+    // Unlock next quest in series as AVAILABLE, but do NOT activate it yet
     const idx = this.quests.indexOf(q);
     if (idx + 1 < this.quests.length) {
       const nextQ = this.quests[idx + 1];
       nextQ.status = 'available';
-      this.activeQuest = nextQ;
 
       const nextNpc = npcs.find(n => n.id === nextQ.giverId);
       if (nextNpc) nextNpc.setQuestState('available');
@@ -246,6 +247,7 @@ export class QuestManager {
     const currentNpc = npcs.find(n => n.id === q.giverId);
     if (currentNpc) currentNpc.setQuestState('completed');
 
-    this.ui.updateQuestHUD(this.getActiveQuest());
+    // Hide quest tracker until player accepts next mission
+    this.ui.updateQuestHUD(null);
   }
 }

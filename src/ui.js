@@ -41,16 +41,18 @@ export class GameUI {
         </div>
       </div>
 
-      <div class="quest-tracker" id="quest-tracker">
+      <div class="quest-tracker hidden" id="quest-tracker">
         <div class="quest-tracker-badge">ACTIVE MISSION</div>
-        <div class="quest-tracker-title" id="qt-title">The Parable of the Lost Sheep</div>
-        <div class="quest-tracker-ref" id="qt-ref">Luke 15:4-7</div>
-        <div class="quest-tracker-obj" id="qt-obj">Find 3 lost sheep and guide them safely to the sheepfold corral.</div>
-        <div class="quest-tracker-progress" id="qt-progress">Progress: 0 / 3</div>
+        <div class="quest-tracker-title" id="qt-title"></div>
+        <div class="quest-tracker-ref" id="qt-ref"></div>
+        <div class="quest-tracker-obj" id="qt-obj"></div>
+        <div class="quest-tracker-progress" id="qt-progress"></div>
       </div>
 
       <div class="prompt-interaction" id="interaction-prompt">
-        <span class="key-badge">💬</span> <span id="prompt-text">Interact</span>
+        <span class="prompt-icon">💬</span>
+        <span class="prompt-action">Interact</span>
+        <strong class="prompt-target"></strong>
       </div>
     `;
     document.body.appendChild(this.hudEl);
@@ -59,18 +61,28 @@ export class GameUI {
     this.dialogueModal = document.createElement('div');
     this.dialogueModal.className = 'modal-backdrop hidden';
     this.dialogueModal.innerHTML = `
-      <div class="parchment-box dialogue-box">
+      <div class="parchment-box dialogue-box" id="dialogue-box">
         <div class="dialogue-header">
-          <div class="speaker-avatar" id="dialogue-avatar">📜</div>
-          <div>
+          <div class="speaker-avatar-wrap">
+            <div class="speaker-avatar" id="dialogue-avatar">👴</div>
+          </div>
+          <div class="speaker-meta">
             <div class="speaker-name" id="dialogue-name">Elder Simeon</div>
             <div class="speaker-title" id="dialogue-title">Bethany Village Patriarch</div>
           </div>
+          <div class="dialogue-counter" id="dialogue-counter">1 / 1</div>
         </div>
-        <div class="dialogue-content" id="dialogue-text">...</div>
-        <div class="dialogue-actions">
-          <button id="dialogue-btn-next" class="parchment-btn primary-btn">Continue</button>
-          <button id="dialogue-btn-close" class="parchment-btn">Farewell</button>
+
+        <div class="dialogue-body" id="dialogue-body">
+          <div class="dialogue-content" id="dialogue-text">...</div>
+          <div class="dialogue-quest-card hidden" id="dialogue-quest-card"></div>
+        </div>
+
+        <div class="dialogue-footer">
+          <div class="dialogue-hint" id="dialogue-hint">Tap text to skip typing</div>
+          <div class="dialogue-actions" id="dialogue-actions">
+            <!-- Populated dynamically -->
+          </div>
         </div>
       </div>
     `;
@@ -303,84 +315,253 @@ export class GameUI {
   }
 
   updateQuestHUD(quest) {
-    if (!quest) return;
-    document.getElementById('qt-title').innerText = quest.title;
-    document.getElementById('qt-ref').innerText = quest.scriptureRef || '';
-    document.getElementById('qt-obj').innerText = quest.objective;
+    const tracker = document.getElementById('quest-tracker');
+    if (!tracker) return;
+
+    if (!quest || (quest.status !== 'active' && quest.status !== 'ready')) {
+      tracker.classList.add('hidden');
+      return;
+    }
+
+    tracker.classList.remove('hidden');
+    const titleEl = document.getElementById('qt-title');
+    const refEl = document.getElementById('qt-ref');
+    const objEl = document.getElementById('qt-obj');
+    if (titleEl) titleEl.innerText = quest.title;
+    if (refEl) refEl.innerText = quest.scriptureRef || '';
+    if (objEl) objEl.innerText = quest.objective;
+
+    const badgeEl = tracker.querySelector('.quest-tracker-badge');
+    if (badgeEl) {
+      if (quest.status === 'ready') {
+        badgeEl.innerText = 'MISSION READY TO COMPLETE';
+        badgeEl.classList.add('ready');
+      } else {
+        badgeEl.innerText = 'ACTIVE MISSION';
+        badgeEl.classList.remove('ready');
+      }
+    }
 
     const progressEl = document.getElementById('qt-progress');
-    if (quest.targetCount > 1) {
-      progressEl.style.display = 'block';
-      progressEl.innerText = `Progress: ${quest.currentCount} / ${quest.targetCount}`;
-    } else {
-      progressEl.style.display = 'none';
+    if (progressEl) {
+      if (quest.targetCount > 1) {
+        progressEl.style.display = 'block';
+        progressEl.innerText = `Progress: ${quest.currentCount} / ${quest.targetCount}`;
+      } else {
+        progressEl.style.display = 'none';
+      }
     }
   }
 
-  showInteractionPrompt(text) {
+  showInteractionPrompt(data) {
     const prompt = document.getElementById('interaction-prompt');
-    const label = document.getElementById('prompt-text');
-    label.innerText = text;
+    if (!prompt) return;
+
+    if (typeof data === 'string') {
+      prompt.innerHTML = `
+        <span class="prompt-icon">💬</span>
+        <span class="prompt-action">${data}</span>
+      `;
+    } else {
+      prompt.innerHTML = `
+        <span class="prompt-icon">${data.icon || '💬'}</span>
+        <span class="prompt-action">${data.action}</span>
+        <strong class="prompt-target">${data.target}</strong>
+      `;
+    }
     prompt.classList.add('visible');
     
     const touchBtn = document.getElementById('btn-touch-interact');
-    if(touchBtn) touchBtn.classList.add('pulse');
+    if (touchBtn) touchBtn.classList.add('pulse');
   }
 
   hideInteractionPrompt() {
     const prompt = document.getElementById('interaction-prompt');
-    prompt.classList.remove('visible');
+    if (prompt) prompt.classList.remove('visible');
 
     const touchBtn = document.getElementById('btn-touch-interact');
-    if(touchBtn) touchBtn.classList.remove('pulse');
+    if (touchBtn) touchBtn.classList.remove('pulse');
   }
 
-  openDialogue({ npc, lines, onComplete }) {
+  formatDialogueText(text) {
+    // Style quoted scripture & direct speech with warm glowing quotes
+    return text.replace(/['"]([^'"]+)['"]/g, '<span class="scripture-quote">“$1”</span>');
+  }
+
+  openDialogue({ npc, lines, type = 'greeting', quest = null, onAccept, onDecline, onComplete }) {
     this.dialogueModal.classList.remove('hidden');
+
+    const avatarMap = {
+      simeon: '👴',
+      martha: '👩',
+      caleb: '🧑‍🌾'
+    };
+    const avatarEl = document.getElementById('dialogue-avatar');
+    if (avatarEl) avatarEl.innerText = avatarMap[npc.id] || '📜';
+
     document.getElementById('dialogue-name').innerText = npc.name;
     document.getElementById('dialogue-title').innerText = npc.title;
 
     let lineIndex = 0;
+    let isTyping = false;
+    const dialogueBox = document.getElementById('dialogue-box');
     const textEl = document.getElementById('dialogue-text');
-    const nextBtn = document.getElementById('dialogue-btn-next');
-    const closeBtn = document.getElementById('dialogue-btn-close');
+    const cardEl = document.getElementById('dialogue-quest-card');
+    const counterEl = document.getElementById('dialogue-counter');
+    const actionsEl = document.getElementById('dialogue-actions');
+    const hintEl = document.getElementById('dialogue-hint');
+
+    const renderButtons = () => {
+      actionsEl.innerHTML = '';
+      const isLast = lineIndex === lines.length - 1;
+
+      if (!isLast) {
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'parchment-btn primary-btn';
+        nextBtn.innerText = 'Continue ❯';
+        nextBtn.onclick = (e) => {
+          e.stopPropagation();
+          sounds.ensureContext();
+          lineIndex++;
+          showLine();
+        };
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'parchment-btn';
+        closeBtn.innerText = 'Leave';
+        closeBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.dialogueModal.classList.add('hidden');
+          if (onDecline) onDecline();
+        };
+
+        actionsEl.appendChild(closeBtn);
+        actionsEl.appendChild(nextBtn);
+      } else {
+        // Final line actions depending on dialogue type
+        if (type === 'offer' && quest) {
+          const acceptBtn = document.createElement('button');
+          acceptBtn.className = 'parchment-btn primary-btn accept-quest-btn';
+          acceptBtn.innerHTML = '✦ Accept Mission';
+          acceptBtn.onclick = (e) => {
+            e.stopPropagation();
+            sounds.ensureContext();
+            this.dialogueModal.classList.add('hidden');
+            if (onAccept) onAccept();
+          };
+
+          const declineBtn = document.createElement('button');
+          declineBtn.className = 'parchment-btn';
+          declineBtn.innerText = 'Maybe Later';
+          declineBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.dialogueModal.classList.add('hidden');
+            if (onDecline) onDecline();
+          };
+
+          actionsEl.appendChild(declineBtn);
+          actionsEl.appendChild(acceptBtn);
+        } else if (type === 'turn_in' && quest) {
+          const claimBtn = document.createElement('button');
+          claimBtn.className = 'parchment-btn primary-btn claim-reward-btn';
+          claimBtn.innerHTML = 'Claim Sacred Scroll 📜';
+          claimBtn.onclick = (e) => {
+            e.stopPropagation();
+            sounds.ensureContext();
+            this.dialogueModal.classList.add('hidden');
+            if (onComplete) onComplete();
+          };
+
+          actionsEl.appendChild(claimBtn);
+        } else if (type === 'in_progress') {
+          const okBtn = document.createElement('button');
+          okBtn.className = 'parchment-btn primary-btn';
+          okBtn.innerText = 'Understood ❯';
+          okBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.dialogueModal.classList.add('hidden');
+          };
+          actionsEl.appendChild(okBtn);
+        } else {
+          // Greeting
+          const byeBtn = document.createElement('button');
+          byeBtn.className = 'parchment-btn primary-btn';
+          byeBtn.innerText = 'Farewell';
+          byeBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.dialogueModal.classList.add('hidden');
+          };
+          actionsEl.appendChild(byeBtn);
+        }
+      }
+    };
+
+    const finishLineImmediately = () => {
+      if (!isTyping) return false;
+      clearTimeout(this.typewriterTimeout);
+      isTyping = false;
+      const currentRawLine = lines[lineIndex];
+      textEl.innerHTML = this.formatDialogueText(currentRawLine);
+
+      if (lineIndex === lines.length - 1 && type === 'offer' && quest) {
+        cardEl.classList.remove('hidden');
+        cardEl.innerHTML = `
+          <div class="quest-offer-box">
+            <div class="qob-ribbon">📜 SACRED MISSION OFFER</div>
+            <div class="qob-title">${quest.title}</div>
+            <div class="qob-ref">📖 ${quest.scriptureRef || ''}</div>
+            <div class="qob-obj">🎯 ${quest.objective}</div>
+          </div>
+        `;
+      } else if (lineIndex === lines.length - 1 && type === 'turn_in' && quest) {
+        cardEl.classList.remove('hidden');
+        cardEl.innerHTML = `
+          <div class="quest-turnin-box">
+            <div class="qtb-ribbon">✨ MISSION ACCOMPLISHED</div>
+            <div class="qtb-title">${quest.title}</div>
+            <div class="qtb-sub">All objectives fulfilled faithfully in the name of the Lord.</div>
+          </div>
+        `;
+      } else {
+        cardEl.classList.add('hidden');
+      }
+
+      renderButtons();
+      if (hintEl) hintEl.innerText = lineIndex < lines.length - 1 ? 'Tap Continue ❯' : '';
+      return true;
+    };
+
+    // Tap dialogue body to instantly reveal full text
+    dialogueBox.onclick = () => {
+      if (isTyping) {
+        finishLineImmediately();
+      }
+    };
 
     const showLine = () => {
       const line = lines[lineIndex];
-      textEl.innerText = "";
+      counterEl.innerText = `${lineIndex + 1} / ${lines.length}`;
+      cardEl.classList.add('hidden');
+      textEl.innerHTML = '';
       clearTimeout(this.typewriterTimeout);
+      isTyping = true;
+      if (hintEl) hintEl.innerText = 'Tap text to skip typing ▾';
 
       let charIdx = 0;
       const type = () => {
+        if (!isTyping) return;
         if (charIdx < line.length) {
-          textEl.innerText += line[charIdx];
+          textEl.innerText = line.slice(0, charIdx + 1);
           if (charIdx % 3 === 0) sounds.playDialogueBlip();
           charIdx++;
-          this.typewriterTimeout = setTimeout(type, 18);
+          this.typewriterTimeout = setTimeout(type, 16);
+        } else {
+          // Finished typing this line
+          finishLineImmediately();
         }
       };
       type();
-
-      if (lineIndex === lines.length - 1) {
-        nextBtn.innerText = "Accept Mission";
-      } else {
-        nextBtn.innerText = "Next »";
-      }
-    };
-
-    nextBtn.onclick = () => {
-      sounds.ensureContext();
-      if (lineIndex < lines.length - 1) {
-        lineIndex++;
-        showLine();
-      } else {
-        this.dialogueModal.classList.add('hidden');
-        if (onComplete) onComplete();
-      }
-    };
-
-    closeBtn.onclick = () => {
-      this.dialogueModal.classList.add('hidden');
+      renderButtons();
     };
 
     showLine();

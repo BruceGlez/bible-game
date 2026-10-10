@@ -1,5 +1,4 @@
-// Service Worker for The Seeker: Path of the Wayfarer
-const CACHE_NAME = 'the-seeker-v2';
+const CACHE_NAME = 'the-seeker-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

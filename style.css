@@ -236,20 +236,29 @@ body, html {
   bottom: 85px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(22, 17, 12, 0.85);
+  background: rgba(22, 16, 10, 0.92);
   color: #f7eedb;
-  border: 1px solid #c5a059;
+  border: 1.5px solid #d4af37;
   border-radius: 30px;
-  padding: 8px 22px;
-  font-size: 1.05rem;
-  letter-spacing: 1px;
+  padding: 8px 18px;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   opacity: 0;
-  transition: opacity 0.2s, transform 0.2s;
-  pointer-events: none;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  transition: opacity 0.2s, transform 0.2s, background 0.15s;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 12px rgba(212, 175, 55, 0.3);
+  z-index: 15;
+  white-space: nowrap;
+}
+
+.prompt-interaction:active {
+  transform: translateX(-50%) translateY(-2px) scale(0.96);
+  background: rgba(36, 26, 16, 0.98);
 }
 
 .prompt-interaction.visible {
@@ -257,14 +266,23 @@ body, html {
   transform: translateX(-50%) translateY(-5px);
 }
 
-.key-badge {
-  background: #c5a059;
-  color: #21160a;
-  font-weight: bold;
-  font-family: monospace;
-  font-size: 0.9rem;
-  padding: 2px 8px;
-  border-radius: 4px;
+.prompt-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.prompt-action {
+  color: #d6be95;
+  font-style: italic;
+  font-size: 0.88rem;
+}
+
+.prompt-target {
+  color: #ffe699;
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.5px;
 }
 
 /* Bottom Controls Hint */
@@ -376,56 +394,193 @@ body, html {
 
 /* Dialogue Box */
 .dialogue-box {
-  width: 90%;
-  max-width: 650px;
+  width: 92%;
+  max-width: 580px;
+  background: #f7efe1;
+  border: 3px solid #7c5a2c;
+  outline: 2px solid #caa458;
+  outline-offset: -5px;
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  user-select: none;
 }
 
 .dialogue-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  border-bottom: 2px solid #ccb28a;
-  padding-bottom: 12px;
-  margin-bottom: 16px;
+  gap: 12px;
+  border-bottom: 2px solid #d5c09e;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.speaker-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
 }
 
 .speaker-avatar {
-  font-size: 2.2rem;
-  background: #e3d2b3;
-  width: 54px;
-  height: 54px;
+  font-size: 2rem;
+  background: radial-gradient(circle, #f9f1e1, #dfcaa2);
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 2px solid #8e6c38;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+}
+
+.speaker-meta {
+  flex-grow: 1;
 }
 
 .speaker-name {
   font-family: 'Cinzel', serif;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 900;
-  color: #4a341b;
+  color: #432910;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
 }
 
 .speaker-title {
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-style: italic;
-  color: #7d592b;
+  color: #7b582b;
+  margin-top: 2px;
+}
+
+.dialogue-counter {
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  font-weight: bold;
+  color: #7b582b;
+  background: rgba(142, 108, 56, 0.15);
+  border: 1px solid #caa458;
+  padding: 3px 8px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.dialogue-body {
+  margin-bottom: 16px;
 }
 
 .dialogue-content {
-  font-size: 1.25rem;
-  line-height: 1.6;
-  min-height: 85px;
-  color: #352617;
-  margin-bottom: 22px;
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 1.15rem;
+  line-height: 1.55;
+  color: #2a1a0c;
+  min-height: 65px;
+  max-height: 38vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.scripture-quote {
+  font-style: italic;
+  color: #8c5314;
+  font-weight: 600;
+  background: rgba(212, 175, 55, 0.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.dialogue-quest-card {
+  margin-top: 12px;
+  animation: fadeInCard 0.25s ease-out;
+}
+
+@keyframes fadeInCard {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.quest-offer-box, .quest-turnin-box {
+  background: rgba(240, 226, 200, 0.85);
+  border: 2px solid #caa458;
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.quest-turnin-box {
+  background: rgba(215, 235, 215, 0.85);
+  border-color: #6da46d;
+}
+
+.qob-ribbon, .qtb-ribbon {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #825418;
+  margin-bottom: 4px;
+}
+
+.qtb-ribbon { color: #2d6b38; }
+
+.qob-title, .qtb-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #3b250d;
+}
+
+.qob-ref {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #8a6225;
+  margin-bottom: 4px;
+}
+
+.qob-obj, .qtb-sub {
+  font-size: 0.9rem;
+  color: #34210f;
+  line-height: 1.35;
+}
+
+.dialogue-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px dashed #d5c09e;
+  padding-top: 12px;
+}
+
+.dialogue-hint {
+  font-size: 0.72rem;
+  color: #8c6f48;
+  font-style: italic;
 }
 
 .dialogue-actions {
   display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 12px;
+}
+
+.accept-quest-btn {
+  background: linear-gradient(135deg, #e4be54, #b98e29) !important;
+  color: #211202 !important;
+  border-color: #ffe699 !important;
+  font-weight: 900 !important;
+  box-shadow: 0 3px 10px rgba(185, 142, 41, 0.45) !important;
+}
+
+.claim-reward-btn {
+  background: linear-gradient(135deg, #62b362, #398239) !important;
+  color: #ffffff !important;
+  border-color: #a4e6a4 !important;
+  font-weight: 900 !important;
+  box-shadow: 0 3px 10px rgba(57, 130, 57, 0.4) !important;
 }
 
 /* Journal Book (Dual-page) */
@@ -942,12 +1097,11 @@ html, body {
 /* Interaction prompt sits above the thumbs, centered */
 .prompt-interaction {
   bottom: calc(176px + env(safe-area-inset-bottom, 0px));
-  font-size: 0.9rem;
-  padding: 7px 16px;
-  max-width: 86vw;
+  font-size: 0.88rem;
+  padding: 8px 18px;
+  max-width: 90vw;
   white-space: nowrap;
 }
-.key-badge { font-family: inherit; padding: 1px 6px; }
 
 .game-notification {
   top: calc(12px + env(safe-area-inset-top, 0px));

@@ -64,6 +64,15 @@ class Game {
       this.ui.toggleJournal(this.quests.collectedScrolls);
     };
 
+    // Make interaction prompt clickable directly on mobile
+    const promptEl = document.getElementById('interaction-prompt');
+    if (promptEl) {
+      promptEl.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this.handleInteraction();
+      });
+    }
+
     // Resize listener
     window.addEventListener('resize', () => this.onWindowResize());
 
@@ -494,8 +503,9 @@ class Game {
       this.ui.openDialogue({
         npc,
         lines: [
-          `Grace and peace to you, traveler. May the Lord guard your steps as you journey through the hills.`
-        ]
+          `Grace and peace to you, traveler. May the Lord guard your steps as you journey through the hills of Bethany.`
+        ],
+        type: 'greeting'
       });
       return;
     }
@@ -504,20 +514,29 @@ class Game {
       this.ui.openDialogue({
         npc,
         lines: q.dialogueIntro,
-        onComplete: () => {
+        type: 'offer',
+        quest: q,
+        onAccept: () => {
           this.quests.startQuest(q.id);
           npc.setQuestState('active');
+        },
+        onDecline: () => {
+          this.ui.showNotification("Mission postponed. Speak to Elder Simeon whenever you are ready.");
         }
       });
     } else if (q.status === 'active') {
       this.ui.openDialogue({
         npc,
-        lines: q.dialogueInProgress
+        lines: q.dialogueInProgress,
+        type: 'in_progress',
+        quest: q
       });
     } else if (q.status === 'ready') {
       this.ui.openDialogue({
         npc,
         lines: q.dialogueComplete,
+        type: 'turn_in',
+        quest: q,
         onComplete: () => {
           this.quests.completeQuest(q.id, this.npcs);
         }
@@ -532,7 +551,7 @@ class Game {
     // NPC prompt
     for (const npc of this.npcs) {
       if (p.distanceTo(npc.position) < 4.0) {
-        foundPrompt = `Speak with ${npc.name}`;
+        foundPrompt = { icon: '💬', action: 'Speak with', target: npc.name };
         break;
       }
     }
@@ -541,7 +560,7 @@ class Game {
     if (!foundPrompt) {
       for (const sheep of this.sheepList) {
         if (p.distanceTo(sheep.position) < 3.5 && !sheep.isRescued && !sheep.isSafelyHome) {
-          foundPrompt = `Guide ${sheep.name}`;
+          foundPrompt = { icon: '🐑', action: 'Guide', target: sheep.name };
           break;
         }
       }
@@ -553,21 +572,21 @@ class Game {
       if (activeQ.id === 'living_water') {
         const crankPos = new THREE.Vector3(52, this.world.getTerrainHeight(52, -52) + 3.2, -52);
         if (!activeQ.hasItem && p.distanceTo(crankPos) < 5.0) {
-          foundPrompt = "Pick up Stone Gear Mechanism";
+          foundPrompt = { icon: '⚙️', action: 'Pick up', target: 'Stone Gear Mechanism' };
         } else if (activeQ.hasItem && activeQ.currentCount === 0 && p.distanceTo(new THREE.Vector3(0, this.world.getTerrainHeight(0, 0), 0)) < 4.0) {
-          foundPrompt = "Restore Village Well";
+          foundPrompt = { icon: '💧', action: 'Restore', target: 'Village Well' };
         }
       } else if (activeQ.id === 'smooth_stones') {
         for (const st of this.world.smoothStones) {
           if (!st.collected && Math.hypot(p.x - st.x, p.z - st.z) < 3.0) {
-            foundPrompt = `Take ${st.label}`;
+            foundPrompt = { icon: '🪨', action: 'Take', target: st.label };
             break;
           }
         }
       } else if (activeQ.id === 'ancient_cavern') {
         const cavernDist = Math.hypot(p.x - (-55), p.z - 35);
         if (cavernDist < 9.0) {
-          foundPrompt = "Tap ✨ FAITH to Cast Light";
+          foundPrompt = { icon: '✨', action: 'Channel', target: 'Light of Faith' };
         }
       }
     }
