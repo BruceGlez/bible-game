@@ -36,6 +36,7 @@ export class GameUI {
           <button id="btn-journal" class="hud-btn">📜 Journal [Tab]</button>
           <button id="btn-audio" class="hud-btn">🎵 Audio</button>
           <button id="btn-help" class="hud-btn">❓ Help</button>
+          <button id="btn-install" class="hud-btn install-btn hidden">📲 Install</button>
           <button id="btn-fullscreen" class="hud-btn">⛶</button>
         </div>
       </div>
@@ -169,14 +170,33 @@ export class GameUI {
       </div>
       <div class="action-buttons">
         <div class="action-buttons-wrapper">
-          <div class="touch-btn btn-jump" id="btn-touch-jump">J</div>
-          <div class="touch-btn btn-roll" id="btn-touch-roll">R</div>
-          <div class="touch-btn btn-faith" id="btn-touch-faith">Q</div>
-          <div class="touch-btn btn-interact" id="btn-touch-interact">E</div>
+          <div class="touch-btn btn-jump" id="btn-touch-jump" title="Jump"><span class="btn-icon">⬆</span><span class="btn-text">JUMP</span></div>
+          <div class="touch-btn btn-roll" id="btn-touch-roll" title="Evade Roll"><span class="btn-icon">💨</span><span class="btn-text">ROLL</span></div>
+          <div class="touch-btn btn-faith" id="btn-touch-faith" title="Light of Faith"><span class="btn-icon">✨</span><span class="btn-text">FAITH</span></div>
+          <div class="touch-btn btn-interact" id="btn-touch-interact" title="Interact"><span class="btn-icon">💬</span><span class="btn-text">ACT</span></div>
         </div>
       </div>
     `;
     document.body.appendChild(this.mobileControlsEl);
+
+    // 8. iOS Install Instruction Modal
+    this.iosInstallModal = document.createElement('div');
+    this.iosInstallModal.className = 'modal-backdrop hidden';
+    this.iosInstallModal.innerHTML = `
+      <div class="parchment-box ios-install-box">
+        <div class="journal-close-btn" id="ios-install-close">✕</div>
+        <div class="ios-install-icon">📲</div>
+        <h2 class="page-header">INSTALL ON YOUR DEVICE</h2>
+        <p class="page-sub">Play full-screen with offline support on iOS or Android.</p>
+        <div class="ios-install-steps">
+          <div class="ios-step"><span class="step-num">1</span> Tap the <strong>Share</strong> icon <strong>⎋</strong> in Safari (or Menu ⋮ in Chrome).</div>
+          <div class="ios-step"><span class="step-num">2</span> Scroll down and tap <strong>Add to Home Screen ⊞</strong>.</div>
+          <div class="ios-step"><span class="step-num">3</span> Open from your Home Screen for full immersion!</div>
+        </div>
+        <button id="ios-install-ok" class="parchment-btn primary-btn" style="margin-top: 18px; width: 100%;">Understood</button>
+      </div>
+    `;
+    document.body.appendChild(this.iosInstallModal);
 
     // Setup button listeners
     this.setupListeners();
@@ -225,6 +245,29 @@ export class GameUI {
         document.exitFullscreen();
       }
     });
+
+    // Install Button handler
+    const btnInstall = document.getElementById('btn-install');
+    btnInstall.addEventListener('click', () => {
+      if (this.onInstallHandler) {
+        this.onInstallHandler();
+      } else {
+        this.showIOSInstallTip();
+      }
+    });
+
+    document.getElementById('ios-install-close').addEventListener('click', () => {
+      this.iosInstallModal.classList.add('hidden');
+    });
+    document.getElementById('ios-install-ok').addEventListener('click', () => {
+      this.iosInstallModal.classList.add('hidden');
+    });
+
+    // Check if on mobile device to show install button if not standalone
+    const isStandalone = ('standalone' in navigator && navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
+    if (!isStandalone) {
+      btnInstall.classList.remove('hidden');
+    }
 
     // Reward modal close
     document.getElementById('reward-btn-continue').addEventListener('click', () => {
@@ -415,5 +458,24 @@ export class GameUI {
         ${sc.reflection}
       </div>
     `;
+  }
+
+  setupPWAInstall(onInstallClick) {
+    this.onInstallHandler = onInstallClick;
+    const btn = document.getElementById('btn-install');
+    if (btn) {
+      btn.classList.remove('hidden');
+    }
+  }
+
+  showIOSInstallTip() {
+    this.iosInstallModal.classList.remove('hidden');
+  }
+
+  hideInstallButton() {
+    const btn = document.getElementById('btn-install');
+    if (btn) {
+      btn.classList.add('hidden');
+    }
   }
 }

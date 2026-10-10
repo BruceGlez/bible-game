@@ -21,6 +21,7 @@ class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.container.appendChild(this.renderer.domElement);
 
     // Camera
@@ -60,6 +61,22 @@ class Game {
 
     // Resize listener
     window.addEventListener('resize', () => this.onWindowResize());
+
+    // PWA Install prompt listener (Android/Chrome)
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.deferredInstallPrompt = e;
+      this.ui.setupPWAInstall(async () => {
+        if (this.deferredInstallPrompt) {
+          this.deferredInstallPrompt.prompt();
+          const choice = await this.deferredInstallPrompt.userChoice;
+          if (choice && choice.outcome === 'accepted') {
+            this.ui.hideInstallButton();
+          }
+          this.deferredInstallPrompt = null;
+        }
+      });
+    });
 
     // Initial notification & first quest state
     setTimeout(() => {
@@ -190,10 +207,16 @@ class Game {
   setupTouchInput() {
     this.touchJoystick = { x: 0, z: 0, active: false, id: null };
     
-    // Joystick
+    // Joystick elements
     const zone = document.getElementById('joystick-zone');
     const knob = document.getElementById('joystick-knob');
-    if (!zone || !knob) return; // Prevent error if UI not loaded
+    const controlsContainer = document.querySelector('.mobile-controls-container');
+    if (!zone || !knob) return;
+
+    // Show mobile controls on touch devices
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      if (controlsContainer) controlsContainer.style.display = 'block';
+    }
 
     const handleJoystickMove = (e) => {
       if (!this.touchJoystick.active) return;
@@ -216,9 +239,9 @@ class Game {
 
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
 
-      // Normalize input with deadzone
+      // Deadzone & normalization
       const normDist = dist / maxDist;
-      if (normDist > 0.1) {
+      if (normDist > 0.08) {
         this.touchJoystick.x = dx / maxDist;
         this.touchJoystick.z = dy / maxDist;
       } else {
@@ -227,16 +250,27 @@ class Game {
       }
     };
 
-    zone.addEventListener('touchstart', (e) => {
-      e.preventDefault(); // prevent scrolling
-      const touch = e.changedTouches[0];
-      this.touchJoystick.active = true;
-      this.touchJoystick.id = touch.identifier;
-      
-      // Start music on first touch if not started
-      sounds.startMusic();
-      
-      handleJoystickMove(e);
+    // Allow thumb placement across bottom-left quadrant
+    window.addEventListener('touchstart', (e) => {
+      if (this.touchJoystick.active) return;
+      for (const touch of Array.from(e.changedTouches)) {
+        if (touch.clientX < window.innerWidth * 0.45 && touch.clientY > window.innerHeight * 0.28) {
+          // Ignore if touching HUD
+          if (e.target.closest('.hud-top-left') || e.target.closest('.quest-tracker') || e.target.closest('.modal-backdrop')) return;
+          
+          this.touchJoystick.active = true;
+          this.touchJoystick.id = touch.identifier;
+          sounds.startMusic();
+
+          // Anchor joystick base directly under user thumb
+          zone.style.left = `${Math.max(10, touch.clientX - 60)}px`;
+          zone.style.top = `${Math.max(10, touch.clientY - 60)}px`;
+          zone.style.bottom = 'auto';
+
+          handleJoystickMove(e);
+          break;
+        }
+      }
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
@@ -251,58 +285,91 @@ class Game {
         this.touchJoystick.x = 0;
         this.touchJoystick.z = 0;
         knob.style.transform = `translate(0px, 0px)`;
+        // Reset joystick back to standard dock position
+        zone.style.left = '24px';
+        zone.style.bottom = '24px';
+        zone.style.top = 'auto';
       }
     };
 
     window.addEventListener('touchend', handleJoystickEnd);
     window.addEventListener('touchcancel', handleJoystickEnd);
 
-    // Action Buttons
+    // Action Buttons with responsive haptics
+    const triggerHaptic = (ms) => {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(ms); } catch (_) {}
+      }
+    };
+
     const btnJump = document.getElementById('btn-touch-jump');
     btnJump.addEventListener('touchstart', (e) => {
       e.preventDefault();
       this.character.triggerJump();
-      if(navigator.vibrate) navigator.vibrate(15);
+      triggerHaptic(15);
     }, { passive: false });
 
     const btnRoll = document.getElementById('btn-touch-roll');
     btnRoll.addEventListener('touchstart', (e) => {
       e.preventDefault();
       this.character.triggerRoll();
-      if(navigator.vibrate) navigator.vibrate(20);
+      triggerHaptic(20);
     }, { passive: false });
 
     const btnFaith = document.getElementById('btn-touch-faith');
     btnFaith.addEventListener('touchstart', (e) => {
       e.preventDefault();
       this.handleFaithAbility();
-      if(navigator.vibrate) navigator.vibrate([10, 30, 20]);
+      triggerHaptic([15, 30, 20]);
     }, { passive: false });
 
     const btnInteract = document.getElementById('btn-touch-interact');
     btnInteract.addEventListener('touchstart', (e) => {
       e.preventDefault();
       this.handleInteraction();
-      if(navigator.vibrate) navigator.vibrate(10);
+      triggerHaptic(12);
     }, { passive: false });
 
-    // Touch Orbit Camera
-    this.touchCamera = { active: false, id: null, lastX: 0, lastY: 0 };
+    // Touch Orbit Camera with Pinch-to-Zoom
+    this.touchCamera = { active: false, id: null, lastX: 0, lastY: 0, prevPinchDist: null };
+    
     window.addEventListener('touchstart', (e) => {
-      // Ignore if clicking on UI
-      if (e.target.closest('.hud-container') || e.target.closest('.mobile-controls-container') || e.target.closest('.modal-backdrop')) return;
-      
-      const touch = e.changedTouches[0];
-      // Only right side of screen
-      if (touch.clientX > window.innerWidth / 2) {
+      // Ignore clicks on HUD or action controls
+      if (e.target.closest('.hud-container') || e.target.closest('.action-buttons') || e.target.closest('.modal-backdrop')) return;
+
+      const rightTouches = Array.from(e.touches).filter(t => t.clientX >= window.innerWidth * 0.45);
+      if (rightTouches.length === 2) {
+        // Pinch zoom detected
+        this.touchCamera.prevPinchDist = Math.hypot(
+          rightTouches[0].clientX - rightTouches[1].clientX,
+          rightTouches[0].clientY - rightTouches[1].clientY
+        );
+      } else if (rightTouches.length === 1 && !this.touchCamera.active) {
+        const touch = rightTouches[0];
         this.touchCamera.active = true;
         this.touchCamera.id = touch.identifier;
         this.touchCamera.lastX = touch.clientX;
         this.touchCamera.lastY = touch.clientY;
+        this.touchCamera.prevPinchDist = null;
       }
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
+      const rightTouches = Array.from(e.touches).filter(t => t.clientX >= window.innerWidth * 0.45);
+      
+      // Handle pinch-to-zoom
+      if (rightTouches.length >= 2 && this.touchCamera.prevPinchDist !== null) {
+        const curDist = Math.hypot(
+          rightTouches[0].clientX - rightTouches[1].clientX,
+          rightTouches[0].clientY - rightTouches[1].clientY
+        );
+        const diff = curDist - this.touchCamera.prevPinchDist;
+        this.cameraDistance = Math.max(3.8, Math.min(14.0, this.cameraDistance - diff * 0.02));
+        this.touchCamera.prevPinchDist = curDist;
+        return;
+      }
+
+      // Handle single finger camera orbit
       if (!this.touchCamera.active) return;
       const touch = Array.from(e.touches).find(t => t.identifier === this.touchCamera.id);
       if (touch) {
@@ -318,6 +385,10 @@ class Game {
     }, { passive: false });
 
     const endCamera = (e) => {
+      const remainingRight = Array.from(e.touches).filter(t => t.clientX >= window.innerWidth * 0.45);
+      if (remainingRight.length < 2) {
+        this.touchCamera.prevPinchDist = null;
+      }
       const touch = Array.from(e.changedTouches).find(t => t.identifier === this.touchCamera.id);
       if (touch) {
         this.touchCamera.active = false;

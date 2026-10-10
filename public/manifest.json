@@ -1,13 +1,16 @@
 {
   "name": "The Seeker: Path of the Wayfarer",
   "short_name": "The Seeker",
-  "id": "./",
+  "id": "biblical-seeker-3d",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#12100e",
   "theme_color": "#12100e",
-  "orientation": "any",
+  "description": "A 3D Stylized Biblical Action-Adventure Game inspired by ancient Judea and classical third-person adventures.",
+  "categories": ["games", "adventure", "roleplaying"],
   "icons": [
     {
       "src": "./icon-192.png",

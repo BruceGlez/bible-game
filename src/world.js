@@ -17,34 +17,41 @@ export class BiblicalWorld {
     this.createWatchtowerRuins();
     this.createCaveOfInscriptions();
     this.createVegetation();
+    this.createGrassTufts();
     this.createProps();
     this.createAtmosphere();
+    this.createClouds();
   }
 
   createEnvironment() {
-    // Sky color & warm biblical golden daylight
-    this.scene.background = new THREE.Color(0xdcecfb); // Vibrant bright sky
-    this.scene.fog = new THREE.FogExp2(0xe6dfd5, 0.007); // Warm dust fog
+    // Warm biblical golden daylight & atmospheric fog
+    this.scene.background = new THREE.Color(0xdcecfb);
+    this.scene.fog = new THREE.FogExp2(0xe8e0d4, 0.0065);
 
-    // Ambient light - warm desert sun bounce
-    const hemiLight = new THREE.HemisphereLight(0xfffaed, 0x9e8a75, 0.75);
+    // Ambient light - warm desert bounce & sky illumination
+    const hemiLight = new THREE.HemisphereLight(0xfff7ea, 0x8a7761, 0.85);
     this.scene.add(hemiLight);
 
     // Main Golden Sun
-    this.sunLight = new THREE.DirectionalLight(0xfff3d6, 1.3);
-    this.sunLight.position.set(60, 90, 45);
+    this.sunLight = new THREE.DirectionalLight(0xfff1cf, 1.4);
+    this.sunLight.position.set(65, 95, 45);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
     this.sunLight.shadow.camera.near = 10;
-    this.sunLight.shadow.camera.far = 250;
-    const d = 75;
+    this.sunLight.shadow.camera.far = 260;
+    const d = 80;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
     this.sunLight.shadow.camera.top = d;
     this.sunLight.shadow.camera.bottom = -d;
-    this.sunLight.shadow.bias = -0.0005;
+    this.sunLight.shadow.bias = -0.0004;
     this.scene.add(this.sunLight);
+
+    // Soft warm fill light for gentle stylized shadows
+    const fillLight = new THREE.DirectionalLight(0xd9b382, 0.35);
+    fillLight.position.set(-50, 40, -40);
+    this.scene.add(fillLight);
   }
 
   getTerrainHeight(x, z) {
@@ -103,10 +110,57 @@ export class BiblicalWorld {
     }
     geo.computeVertexNormals();
 
-    // Stylized desert/sandstone terrain with slight vertex color variation
+    // Stylized terrain vertex colors: blend grass meadows, warm desert paths, stone cliffs, and brook pebbles
+    const colors = new Float32Array(pos.count * 3);
+    const normals = geo.attributes.normal;
+    const colSand = new THREE.Color(0xdec69a);   // Village paths & warm sand
+    const colGrass = new THREE.Color(0x8fa867);  // Sage green biblical hillside
+    const colRock = new THREE.Color(0xb59e7e);   // Limestone rock
+    const colBrook = new THREE.Color(0x9a8868);  // Damp brook bed
+    const colCliff = new THREE.Color(0xcba476);  // Warm sunlit canyon
+    const finalCol = new THREE.Color();
+
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const ny = normals.getY(i);
+      const dist = Math.hypot(x, z);
+      const brookDist = Math.abs(x - 22);
+
+      // Base: golden sand
+      finalCol.copy(colSand);
+
+      // Brook of Elah depression
+      if (brookDist < 7.5 && Math.abs(z) < 65) {
+        const t = 1 - (brookDist / 7.5);
+        finalCol.lerp(colBrook, t * 0.85);
+      } else if (dist > 20 && ny > 0.80 && y > 0.1) {
+        // Rolling green meadows beyond village
+        const grassFactor = Math.min(1, (dist - 20) / 16) * Math.min(1, (ny - 0.80) / 0.15);
+        finalCol.lerp(colGrass, grassFactor * 0.78);
+      }
+
+      // Steeper slopes & ridges
+      if (ny < 0.78) {
+        const steepness = (0.78 - ny) / 0.35;
+        finalCol.lerp(colRock, Math.min(1, steepness));
+      }
+
+      // High cliffs (watchtower & cave peaks)
+      if (y > 6.0) {
+        finalCol.lerp(colCliff, Math.min(1, (y - 6.0) / 8.0));
+      }
+
+      colors[i * 3] = finalCol.r;
+      colors[i * 3 + 1] = finalCol.g;
+      colors[i * 3 + 2] = finalCol.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
     const terrainMat = new THREE.MeshLambertMaterial({
-      color: 0xdec69a,
-      roughness: 0.9
+      vertexColors: true,
+      roughness: 0.95
     });
 
     this.terrainMesh = new THREE.Mesh(geo, terrainMat);
@@ -693,28 +747,114 @@ export class BiblicalWorld {
     this.scene.add(fireGroup);
   }
 
+  createGrassTufts() {
+    // Instanced stylized grass blades for maximum mobile performance (1 draw call)
+    const tuftCount = 280;
+    const bladeGeo = new THREE.ConeGeometry(0.16, 0.6, 3);
+    bladeGeo.translate(0, 0.3, 0);
+
+    const grassMat = new THREE.MeshLambertMaterial({
+      color: 0x829c5a,
+      roughness: 0.9
+    });
+
+    this.grassInstanced = new THREE.InstancedMesh(bladeGeo, grassMat, tuftCount);
+    this.grassInstanced.receiveShadow = true;
+
+    const dummy = new THREE.Object3D();
+    let placed = 0;
+    let attempts = 0;
+
+    while (placed < tuftCount && attempts < 1500) {
+      attempts++;
+      const gx = (Math.random() - 0.5) * 160;
+      const gz = (Math.random() - 0.5) * 160;
+      const dist = Math.hypot(gx, gz);
+      const brookDist = Math.abs(gx - 22);
+
+      // Place in meadows outside village, away from brook center and deep cave
+      if (dist > 22 && dist < 85 && brookDist > 6.0 && gx > -42) {
+        const gy = this.getTerrainHeight(gx, gz);
+        dummy.position.set(gx, gy, gz);
+        const s = 0.75 + Math.random() * 0.7;
+        dummy.scale.set(s, s * (0.8 + Math.random() * 0.4), s);
+        dummy.rotation.y = Math.random() * Math.PI * 2;
+        dummy.rotation.z = (Math.random() - 0.5) * 0.2;
+        dummy.updateMatrix();
+        this.grassInstanced.setMatrixAt(placed, dummy.matrix);
+        placed++;
+      }
+    }
+
+    this.grassInstanced.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.grassInstanced);
+  }
+
   createAtmosphere() {
     // Soft floating dust motes
-    const particleCount = 60;
+    const particleCount = 70;
     const geom = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
 
     for (let i = 0; i < particleCount * 3; i += 3) {
-      positions[i] = (Math.random() - 0.5) * 80;
+      positions[i] = (Math.random() - 0.5) * 90;
       positions[i + 1] = Math.random() * 12 + 1;
-      positions[i + 2] = (Math.random() - 0.5) * 80;
+      positions[i + 2] = (Math.random() - 0.5) * 90;
     }
     geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
     const pMat = new THREE.PointsMaterial({
       color: 0xffecb3,
-      size: 0.15,
+      size: 0.16,
       transparent: true,
-      opacity: 0.6
+      opacity: 0.65
     });
 
     this.ambientParticles = new THREE.Points(geom, pMat);
     this.scene.add(this.ambientParticles);
+  }
+
+  createClouds() {
+    this.cloudGroup = new THREE.Group();
+    const cloudMat = new THREE.MeshLambertMaterial({
+      color: 0xfffaf2,
+      transparent: true,
+      opacity: 0.88,
+      flatShading: true
+    });
+
+    this.clouds = [];
+    const cloudConfigs = [
+      { x: -50, y: 52, z: -40, scale: 1.4 },
+      { x: 30, y: 56, z: -60, scale: 1.2 },
+      { x: -20, y: 49, z: 50, scale: 1.5 },
+      { x: 60, y: 54, z: 30, scale: 1.3 },
+      { x: -70, y: 58, z: 10, scale: 1.1 }
+    ];
+
+    cloudConfigs.forEach(cfg => {
+      const c = new THREE.Group();
+      c.position.set(cfg.x, cfg.y, cfg.z);
+
+      // Low-poly cloud puffs
+      const puffs = [
+        { ox: 0, oy: 0, oz: 0, r: 4.5 * cfg.scale },
+        { ox: 3.5 * cfg.scale, oy: -0.6, oz: 0.5, r: 3.2 * cfg.scale },
+        { ox: -3.5 * cfg.scale, oy: -0.4, oz: -0.4, r: 3.4 * cfg.scale },
+        { ox: 1.5 * cfg.scale, oy: 1.2, oz: -0.5, r: 2.8 * cfg.scale }
+      ];
+
+      puffs.forEach(p => {
+        const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(p.r, 1), cloudMat);
+        mesh.position.set(p.ox, p.oy, p.oz);
+        c.add(mesh);
+      });
+
+      this.cloudGroup.add(c);
+      this.clouds.push(c);
+    });
+
+    this.scene.add(this.cloudGroup);
   }
 
   update(delta, time) {
@@ -742,6 +882,16 @@ export class BiblicalWorld {
         st.ring.scale.setScalar(1.0 + Math.sin(time * 3 + idx) * 0.15);
       }
     });
+
+    // Slow drifting clouds
+    if (this.clouds) {
+      this.clouds.forEach(c => {
+        c.position.x += delta * 1.2;
+        if (c.position.x > 110) {
+          c.position.x = -110;
+        }
+      });
+    }
 
     // Ambient floating dust particles
     if (this.ambientParticles) {

@@ -416,6 +416,9 @@ export class SeekerCharacter {
       this.rotationY += diff * Math.min(1.0, delta * 14.0);
       this.group.rotation.y = this.rotationY;
 
+      // Dynamic banking/lean into turns
+      this.meshRoot.rotation.z = THREE.MathUtils.lerp(this.meshRoot.rotation.z, -diff * 0.22, delta * 10.0);
+
       // Move forward
       this.velocity.x = Math.sin(this.rotationY) * currentSpeed;
       this.velocity.z = Math.cos(this.rotationY) * currentSpeed;
@@ -431,6 +434,7 @@ export class SeekerCharacter {
     } else {
       this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, 0, delta * 12.0);
       this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, 0, delta * 12.0);
+      this.meshRoot.rotation.z = THREE.MathUtils.lerp(this.meshRoot.rotation.z, 0, delta * 8.0);
     }
 
     // Gravity & Ground snap
