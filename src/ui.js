@@ -36,6 +36,7 @@ export class GameUI {
           <button id="btn-journal" class="hud-btn">📜 Journal [Tab]</button>
           <button id="btn-audio" class="hud-btn">🎵 Audio</button>
           <button id="btn-help" class="hud-btn">❓ Help</button>
+          <button id="btn-fullscreen" class="hud-btn">⛶</button>
         </div>
       </div>
 
@@ -159,6 +160,24 @@ export class GameUI {
     `;
     document.body.appendChild(this.helpModal);
 
+    // 7. Mobile Controls
+    this.mobileControlsEl = document.createElement('div');
+    this.mobileControlsEl.className = 'mobile-controls-container';
+    this.mobileControlsEl.innerHTML = `
+      <div class="joystick-zone" id="joystick-zone">
+        <div class="joystick-knob" id="joystick-knob"></div>
+      </div>
+      <div class="action-buttons">
+        <div class="action-buttons-wrapper">
+          <div class="touch-btn btn-jump" id="btn-touch-jump">J</div>
+          <div class="touch-btn btn-roll" id="btn-touch-roll">R</div>
+          <div class="touch-btn btn-faith" id="btn-touch-faith">Q</div>
+          <div class="touch-btn btn-interact" id="btn-touch-interact">E</div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(this.mobileControlsEl);
+
     // Setup button listeners
     this.setupListeners();
   }
@@ -194,6 +213,17 @@ export class GameUI {
     });
     document.getElementById('help-btn-ok').addEventListener('click', () => {
       this.helpModal.classList.add('hidden');
+    });
+
+    // Fullscreen toggle
+    document.getElementById('btn-fullscreen').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn("Fullscreen error", err);
+        });
+      } else {
+        document.exitFullscreen();
+      }
     });
 
     // Reward modal close
@@ -259,11 +289,17 @@ export class GameUI {
     const label = document.getElementById('prompt-text');
     label.innerText = text;
     prompt.classList.add('visible');
+    
+    const touchBtn = document.getElementById('btn-touch-interact');
+    if(touchBtn) touchBtn.classList.add('pulse');
   }
 
   hideInteractionPrompt() {
     const prompt = document.getElementById('interaction-prompt');
     prompt.classList.remove('visible');
+
+    const touchBtn = document.getElementById('btn-touch-interact');
+    if(touchBtn) touchBtn.classList.remove('pulse');
   }
 
   openDialogue({ npc, lines, onComplete }) {

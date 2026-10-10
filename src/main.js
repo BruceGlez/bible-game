@@ -51,6 +51,7 @@ class Game {
     // Input state
     this.keys = {};
     this.setupInput();
+    this.setupTouchInput();
 
     // Hook journal open button to quest manager scrolls
     document.getElementById('btn-journal').onclick = () => {
@@ -184,6 +185,147 @@ class Game {
     window.addEventListener('wheel', (e) => {
       this.cameraDistance = Math.max(4.0, Math.min(14.0, this.cameraDistance + e.deltaY * 0.005));
     }, { passive: true });
+  }
+
+  setupTouchInput() {
+    this.touchJoystick = { x: 0, z: 0, active: false, id: null };
+    
+    // Joystick
+    const zone = document.getElementById('joystick-zone');
+    const knob = document.getElementById('joystick-knob');
+    if (!zone || !knob) return; // Prevent error if UI not loaded
+
+    const handleJoystickMove = (e) => {
+      if (!this.touchJoystick.active) return;
+      let touch = Array.from(e.touches).find(t => t.identifier === this.touchJoystick.id);
+      if (!touch) return;
+
+      const rect = zone.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+
+      let dx = touch.clientX - cx;
+      let dy = touch.clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      const maxDist = rect.width / 2;
+
+      if (dist > maxDist) {
+        dx = (dx / dist) * maxDist;
+        dy = (dy / dist) * maxDist;
+      }
+
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+
+      // Normalize input with deadzone
+      const normDist = dist / maxDist;
+      if (normDist > 0.1) {
+        this.touchJoystick.x = dx / maxDist;
+        this.touchJoystick.z = dy / maxDist;
+      } else {
+        this.touchJoystick.x = 0;
+        this.touchJoystick.z = 0;
+      }
+    };
+
+    zone.addEventListener('touchstart', (e) => {
+      e.preventDefault(); // prevent scrolling
+      const touch = e.changedTouches[0];
+      this.touchJoystick.active = true;
+      this.touchJoystick.id = touch.identifier;
+      
+      // Start music on first touch if not started
+      sounds.startMusic();
+      
+      handleJoystickMove(e);
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      handleJoystickMove(e);
+    }, { passive: false });
+
+    const handleJoystickEnd = (e) => {
+      let touch = Array.from(e.changedTouches).find(t => t.identifier === this.touchJoystick.id);
+      if (touch) {
+        this.touchJoystick.active = false;
+        this.touchJoystick.id = null;
+        this.touchJoystick.x = 0;
+        this.touchJoystick.z = 0;
+        knob.style.transform = `translate(0px, 0px)`;
+      }
+    };
+
+    window.addEventListener('touchend', handleJoystickEnd);
+    window.addEventListener('touchcancel', handleJoystickEnd);
+
+    // Action Buttons
+    const btnJump = document.getElementById('btn-touch-jump');
+    btnJump.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.character.triggerJump();
+      if(navigator.vibrate) navigator.vibrate(15);
+    }, { passive: false });
+
+    const btnRoll = document.getElementById('btn-touch-roll');
+    btnRoll.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.character.triggerRoll();
+      if(navigator.vibrate) navigator.vibrate(20);
+    }, { passive: false });
+
+    const btnFaith = document.getElementById('btn-touch-faith');
+    btnFaith.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.handleFaithAbility();
+      if(navigator.vibrate) navigator.vibrate([10, 30, 20]);
+    }, { passive: false });
+
+    const btnInteract = document.getElementById('btn-touch-interact');
+    btnInteract.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.handleInteraction();
+      if(navigator.vibrate) navigator.vibrate(10);
+    }, { passive: false });
+
+    // Touch Orbit Camera
+    this.touchCamera = { active: false, id: null, lastX: 0, lastY: 0 };
+    window.addEventListener('touchstart', (e) => {
+      // Ignore if clicking on UI
+      if (e.target.closest('.hud-container') || e.target.closest('.mobile-controls-container') || e.target.closest('.modal-backdrop')) return;
+      
+      const touch = e.changedTouches[0];
+      // Only right side of screen
+      if (touch.clientX > window.innerWidth / 2) {
+        this.touchCamera.active = true;
+        this.touchCamera.id = touch.identifier;
+        this.touchCamera.lastX = touch.clientX;
+        this.touchCamera.lastY = touch.clientY;
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!this.touchCamera.active) return;
+      const touch = Array.from(e.touches).find(t => t.identifier === this.touchCamera.id);
+      if (touch) {
+        const dx = touch.clientX - this.touchCamera.lastX;
+        const dy = touch.clientY - this.touchCamera.lastY;
+
+        this.cameraAngleH -= dx * 0.0055;
+        this.cameraAngleV = Math.max(0.1, Math.min(1.2, this.cameraAngleV + dy * 0.004));
+
+        this.touchCamera.lastX = touch.clientX;
+        this.touchCamera.lastY = touch.clientY;
+      }
+    }, { passive: false });
+
+    const endCamera = (e) => {
+      const touch = Array.from(e.changedTouches).find(t => t.identifier === this.touchCamera.id);
+      if (touch) {
+        this.touchCamera.active = false;
+        this.touchCamera.id = null;
+      }
+    };
+    window.addEventListener('touchend', endCamera);
+    window.addEventListener('touchcancel', endCamera);
   }
 
   handleFaithAbility() {
@@ -411,6 +553,12 @@ class Game {
     if (this.keys['KeyS'] || this.keys['ArrowDown']) inputDir.z += 1;
     if (this.keys['KeyA'] || this.keys['ArrowLeft']) inputDir.x -= 1;
     if (this.keys['KeyD'] || this.keys['ArrowRight']) inputDir.x += 1;
+
+    // Add touch input
+    if (this.touchJoystick && (this.touchJoystick.x !== 0 || this.touchJoystick.z !== 0)) {
+       inputDir.x = this.touchJoystick.x;
+       inputDir.z = this.touchJoystick.z;
+    }
 
     if (inputDir.lengthSq() > 0) {
       inputDir.normalize();
